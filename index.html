@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <title>VAULT-TEC CITIZENSHIP APPLICATION - FORM V-254</title>
+    
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Load Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        /* --- CRT EFFECTS & THEME (Matching index.html) --- */
+        :root {
+            --color-primary: #4ade80; /* Green 400 */
+            --color-secondary: #064e3b; /* Green 900 */
+            --color-alert: #ef4444; /* Red 500 */
+            --color-warning: #eab308; /* Yellow 500 */
+            --color-bg-dark: #050505;
+        }
+
+        @font-face {
+            font-family: 'Share Tech Mono';
+            src: url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+        }
+
+        body {
+            background-color: #000;
+            color: var(--color-primary);
+            font-family: 'Courier New', Courier, monospace;
+            overflow: hidden; 
+            cursor: default;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* --- ANIMATIONS --- */
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+        .animate-blink { animation: blink 1s step-end infinite; }
+        
+        @keyframes quick-flicker {
+            0% { opacity: 1; }
+            3% { opacity: 0.1; }
+            6% { opacity: 1; }
+            7% { opacity: 0.1; }
+            9% { opacity: 1; }
+            100% { opacity: 1; }
+        }
+        .animate-glitch { animation: quick-flicker 4s infinite linear; pointer-events: none; }
+
+        @keyframes scanline {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(100%); }
+        }
+
+        /* CRT Overlay Layers */
+        .scanlines {
+            background: linear-gradient(rgba(18,16,16,0) 50%, rgba(0,0,0,0.1) 50%), linear-gradient(90deg, rgba(255,0,0,0.06), rgba(0,255,0,0.02), rgba(0,0,255,0.06));
+            background-size: 100% 3px, 3px 100%;
+            pointer-events: none;
+            z-index: 50;
+        }
+        
+        .crt-overlay {
+            background: radial-gradient(circle, rgba(0,0,0,0) 60%, rgba(0,0,0,0.4) 100%);
+            pointer-events: none;
+            z-index: 51;
+        }
+
+        .screen-flicker {
+            animation: quick-flicker 10s infinite;
+        }
+        
+        /* Custom Scrollbar */
+        .custom-scrollbar {
+            scrollbar-width: thin;
+            scrollbar-color: #15803d #0a1a0a;
+        }
+        .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #0a1a0a; border-left: 1px solid #14532d; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #15803d; border: 1px solid #000; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #22c55e; }
+
+        /* Form Controls */
+        input[type="text"], input[type="number"] {
+            background: rgba(0, 20, 0, 0.6);
+            border: 1px solid #15803d;
+            color: #4ade80;
+            font-family: inherit;
+            outline: none;
+            text-transform: uppercase;
+        }
+        input:focus {
+            background: rgba(0, 40, 0, 0.8);
+            border-color: #4ade80;
+            box-shadow: 0 0 10px rgba(74, 222, 128, 0.2);
+        }
+
+        .radio-option:checked + label {
+            background-color: #14532d;
+            color: #fff;
+            border-color: #4ade80;
+        }
+
+        .text-shadow-glow { 
+            text-shadow: 0 0 2px rgba(74, 222, 128, 0.4), 0 0 8px rgba(74, 222, 128, 0.2); 
+        }
+
+        /* --- BARCODE GENERATOR CSS --- */
+        .barcode {
+            display: flex;
+            height: 30px;
+            width: 100%;
+            overflow: hidden;
+            justify-content: center;
+            opacity: 0.8;
+        }
+        .barcode-bar {
+            background-color: currentColor;
+            height: 100%;
+            display: inline-block;
+        }
+
+        /* --- PRINT STYLES --- */
+        @media print {
+            body { 
+                background-color: white !important; 
+                color: black !important; 
+                overflow: visible !important;
+            }
+            #root, .crt-overlay, .scanlines, #shell-container { 
+                display: none !important; 
+            }
+            #print-container { 
+                display: block !important; 
+                width: 100%;
+                height: 100%;
+                padding: 20px;
+            }
+            .no-print { display: none !important; }
+        }
+
+        @media screen {
+            #print-container { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Root Container (Screen Mode) -->
+    <div id="root" class="fixed inset-0 bg-black overflow-hidden selection:bg-green-500 selection:text-black"></div>
+
+    <!-- Print Container (Print Mode) -->
+    <div id="print-container" class="hidden font-mono text-black">
+        <!-- Content injected via JS -->
+    </div>
+
+<script>
+    /* --- DATA & CONFIG --- */
+    const MAX_SPECIAL_POINTS = 28; // Standard Fallout Allocation
+    
+    const SPECIAL_DESCRIPTIONS = {
+        S: "STRENGTH: Measures raw physical power. Affects carry weight and melee damage. Essential for Security and Maintenance roles.",
+        P: "PERCEPTION: Measures environmental awareness and accuracy. Vital for Scouts, Reactor Technicians, and Surface Ops.",
+        E: "ENDURANCE: Measures physical fitness and health. Key for surviving radiation exposure and long shifts in the Hydroponics bays.",
+        C: "CHARISMA: Measures ability to lead and influence others. Required for Management, Education, and settling disputes in the Atrium.",
+        I: "INTELLIGENCE: Measures overall mental acuity. Essential for Medical, Engineering, and Science personnel.",
+        A: "AGILITY: Measures coordination and reflexes. Important for machine operation and tactical response.",
+        L: "LUCK: Measures how often fate smiles upon you. Affects critical hits and finding resources. Sometimes better than skill."
+    };
+
+    const QUESTIONS = [
+        {
+            id: 1,
+            text: "The Overseer issues an order that conflicts with an old technical manual. What do you do?",
+            options: [
+                { text: "Follow the Overseer's order without question. Leadership is absolute.", score: { faction: 'Loyalist', role: 'Security' } },
+                { text: "Follow the manual. Preserving pre-war protocols is our sacred duty.", score: { faction: 'Preservationist', role: 'Archives' } },
+                { text: "Modify the procedure to combine both approaches safely.", score: { faction: 'Innovator', role: 'Engineering' } },
+                { text: "Discuss it with my team to find a consensus.", score: { faction: 'Educator', role: 'Management' } }
+            ]
+        },
+        {
+            id: 2,
+            text: "Sensors detect a lone scavenger near the Vault entrance. They appear injured. Action?",
+            options: [
+                { text: "Ignore them. The Vault must remain sealed at all costs.", score: { faction: 'Preservationist', role: 'Management' } },
+                { text: "Alert Security to eliminate the potential threat immediately.", score: { faction: 'Guards', role: 'Security' } },
+                { text: "Request permission to bring them in for interrogation and medical aid.", score: { faction: 'Reclamationist', role: 'Medical' } },
+                { text: "Observe and document their behavior for educational purposes.", score: { faction: 'Educator', role: 'Science' } }
+            ]
+        },
+        {
+            id: 3,
+            text: "The Water Chip is failing. Rations must be cut by 50%. Who should eat first?",
+            options: [
+                { text: "The Executives and Overseer. They are the brain of the Vault.", score: { faction: 'Loyalist', role: 'Management' } },
+                { text: "The Children. They are the future of the A.R.C.", score: { faction: 'Educator', role: 'Medical' } },
+                { text: " The Workers and Engineers fixing the chip. Utility determines value.", score: { faction: 'Innovator', role: 'Engineering' } },
+                { text: "The Security team. We need strength to maintain order during crisis.", score: { faction: 'Guards', role: 'Security' } }
+            ]
+        },
+        {
+            id: 4,
+            text: "Complete the sentence: 'Reclamation Day is...'",
+            options: [
+                { text: "...our ultimate destiny and duty to the world.", score: { faction: 'Reclamationist', role: 'General' } },
+                { text: "...a dangerous gamble we aren't ready for.", score: { faction: 'Preservationist', role: 'Archives' } },
+                { text: "...a logistical challenge requiring preparation.", score: { faction: 'Innovator', role: 'Engineering' } },
+                { text: "...the will of Vault-Tec, to be enacted when ordered.", score: { faction: 'Loyalist', role: 'Security' } }
+            ]
+        },
+        {
+            id: 5,
+            text: "You find a pamphlet questioning the 'Great Plan' hidden in the cafeteria. You:",
+            options: [
+                { text: "Report it to the Overseer immediately. Sedition is cancer.", score: { faction: 'Loyalist', role: 'Security' } },
+                { text: "Read it. It is important to understand all perspectives.", score: { faction: 'Educator', role: 'Archives' } },
+                { text: "Burn it. We cannot risk social instability.", score: { faction: 'Preservationist', role: 'Management' } },
+                { text: "Keep it. Maybe they have a point about our stagnation.", score: { faction: 'Reclamationist', role: 'General' } }
+            ]
+        },
+        {
+            id: 6,
+            text: "A fire breaks out in the Archives. You can only save one thing:",
+            options: [
+                { text: "The Medical Supply Inventory List.", score: { faction: 'Innovator', role: 'Medical' } },
+                { text: "The Pre-War History Holotapes.", score: { faction: 'Preservationist', role: 'Archives' } },
+                { text: "The Personnel Files.", score: { faction: 'Loyalist', role: 'Management' } },
+                { text: "The Tactical Schematics.", score: { faction: 'Guards', role: 'Security' } }
+            ]
+        },
+        {
+            id: 7,
+            text: "Which role serves the Vault best?",
+            options: [
+                { text: "Maintenance. Without machines, we die.", score: { faction: 'Innovator', role: 'Engineering' } },
+                { text: "Security. Without order, we are savages.", score: { faction: 'Guards', role: 'Security' } },
+                { text: "Leadership. Without vision, we are lost.", score: { faction: 'Loyalist', role: 'Management' } },
+                { text: "Medicine. Without health, nothing else matters.", score: { faction: 'Educator', role: 'Medical' } }
+            ]
+        },
+        {
+            id: 8,
+            text: "The surface radiation levels are spiking. What is the cause?",
+            options: [
+                { text: "Who cares? As long as the door stays sealed, we are safe.", score: { faction: 'Preservationist', role: 'General' } },
+                { text: "We need to send a drone to analyze the atmospheric data.", score: { faction: 'Innovator', role: 'Science' } },
+                { text: "It's a sign we should wait longer for Reclamation.", score: { faction: 'Loyalist', role: 'Management' } },
+                { text: "Maybe someone on the surface is detonating something. We should scout.", score: { faction: 'Reclamationist', role: 'Security' } }
+            ]
+        },
+        {
+            id: 9,
+            text: "Your sibling steals an extra ration pack. You catch them.",
+            options: [
+                { text: "Turn them in. The law applies to everyone.", score: { faction: 'Loyalist', role: 'Security' } },
+                { text: "Share my ration with them so they don't have to steal.", score: { faction: 'Educator', role: 'Medical' } },
+                { text: "Help them hack the inventory system to hide the theft.", score: { faction: 'Innovator', role: 'Science' } },
+                { text: "Lecture them on resource scarcity but keep the secret.", score: { faction: 'Preservationist', role: 'Management' } }
+            ]
+        },
+        {
+            id: 10,
+            text: "Final Question: Are you prepared to sacrifice your life for the A.R.C.?",
+            options: [
+                { text: "Without hesitation. For the Vault!", score: { faction: 'Loyalist', role: 'Security' } },
+                { text: "If it ensures the survival of humanity's knowledge.", score: { faction: 'Preservationist', role: 'Archives' } },
+                { text: "I would rather use my skills to prevent the need for sacrifice.", score: { faction: 'Innovator', role: 'Engineering' } },
+                { text: "Only if the order is just and logical.", score: { faction: 'Reclamationist', role: 'General' } }
+            ]
+        }
+    ];
+
+    /* --- GLOBAL STATE --- */
+    window.state = {
+        step: 'intro', // intro, identity, special, goat, processing, result
+        identity: {
+            name: '',
+            age: '',
+            gender: ''
+        },
+        special: {
+            S: 1, P: 1, E: 1, C: 1, I: 1, A: 1, L: 1,
+            pointsRemaining: 21
+        },
+        quiz: {
+            currentQuestionIndex: 0,
+            answers: []
+        },
+        result: {
+            role: '',
+            faction: '',
+            hash: ''
+        }
+    };
+
+    const root = document.getElementById('root');
+
+    /* --- MAIN RENDER LOOP --- */
+    function renderApp() {
+        if (!document.getElementById('shell-container')) {
+            // Initial Shell Setup
+            root.innerHTML = `
+                ${renderCRTOverlay()}
+                <div id="shell-container" class="h-full w-full p-0 md:p-8 transition-opacity duration-1000">
+                    <div class="h-full w-full border-0 md:border-[16px] border-[#1a1a1a] rounded-none md:rounded-3xl bg-[#0a0a0a] relative shadow-[0_0_0_2px_#333,0_0_50px_rgba(0,0,0,0.8)] overflow-hidden flex flex-col box-border">
+                         <!-- Reflection -->
+                        <div class="hidden md:block absolute top-0 right-0 w-1/3 h-1/3 bg-gradient-to-bl from-white/5 to-transparent rounded-tr-xl pointer-events-none z-40"></div>
+                        <!-- Content -->
+                        <div id="screen-content" class="flex-1 overflow-hidden bg-black text-shadow-glow relative z-10 font-mono text-green-500 flex flex-col"></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        const screen = document.getElementById('screen-content');
+        screen.innerHTML = getScreenContent();
+        
+        // Re-initialize icons
+        lucide.createIcons();
+    }
+
+    function renderCRTOverlay() {
+        return `
+        <div class="pointer-events-none fixed inset-0 z-50 overflow-hidden">
+            <div class="absolute inset-0 scanlines"></div>
+            <div class="absolute inset-0 crt-overlay"></div>
+        </div>`;
+    }
+
+    function getScreenContent() {
+        switch(window.state.step) {
+            case 'intro': return renderIntro();
+            case 'identity': return renderIdentity();
+            case 'special': return renderSpecial();
+            case 'goat': return renderGoat();
+            case 'processing': return renderProcessing();
+            case 'result': return renderResult();
+            default: return renderIntro();
+        }
+    }
+
+    /* --- HELPER FUNCTIONS --- */
+    function generateBarcode(seed) {
+        // Simple visual simulation of a barcode based on string length
+        let html = '';
+        for(let i=0; i<30; i++) {
+            const width = Math.random() > 0.5 ? '2px' : '4px';
+            const margin = Math.random() > 0.5 ? '1px' : '3px';
+            html += `<div class="barcode-bar" style="width: ${width}; margin-right: ${margin}"></div>`;
+        }
+        return html;
+    }
+
+    function generateHash(name, role, faction) {
+        // Generate a pseudo-random hash string
+        const chars = '0123456789ABCDEF';
+        let hash = 'V254-';
+        for (let i = 0; i < 8; i++) {
+            hash += chars[Math.floor(Math.random() * 16)];
+        }
+        hash += '-' + role.substring(0,2).toUpperCase();
+        return hash;
+    }
+
+    function triggerPrint() {
+        const { name, age, gender } = window.state.identity;
+        const { role, faction, hash } = window.state.result;
+        const special = window.state.special;
+
+        const date = new Date().toLocaleDateString('en-US');
+        const time = new Date().toLocaleTimeString('en-US');
+
+        const printContent = `
+        <div style="border: 4px solid black; padding: 20px; max-width: 600px; margin: 0 auto; position: relative; background: #fdfdfd;">
+            <!-- Background Watermark -->
+            <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0.05; pointer-events: none; z-index: 0;">
+                <div style="font-size: 200px; font-weight: bold; transform: rotate(-45deg);">VAULT</div>
+            </div>
+
+            <!-- Header -->
+            <div style="border-bottom: 2px solid black; padding-bottom: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; position: relative; z-index: 10;">
+                <div>
+                    <h1 style="font-size: 24px; font-weight: bold; margin: 0;">VAULT-TEC CITIZENSHIP CREDENTIAL</h1>
+                    <div style="font-size: 12px; letter-spacing: 2px;">VAULT 254 // APPALACHIAN SECTOR</div>
+                </div>
+                <div style="border: 2px solid black; padding: 5px 10px; font-weight: bold;">
+                    FORM V-254
+                </div>
+            </div>
+
+            <!-- Main Content Grid -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; position: relative; z-index: 10;">
+                
+                <!-- Personal Info -->
+                <div>
+                    <div style="margin-bottom: 15px;">
+                        <div style="font-size: 10px; font-weight: bold; color: #444;">CITIZEN NAME</div>
+                        <div style="font-size: 18px; font-weight: bold; border-bottom: 1px dotted black; padding-bottom: 2px;">${name.toUpperCase()}</div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                        <div>
+                            <div style="font-size: 10px; font-weight: bold; color: #444;">AGE</div>
+                            <div style="font-size: 16px;">${age}</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 10px; font-weight: bold; color: #444;">GENDER</div>
+                            <div style="font-size: 16px;">${gender}</div>
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <div style="font-size: 10px; font-weight: bold; color: #444;">ASSIGNED ROLE</div>
+                        <div style="font-size: 16px; font-weight: bold; background: #eee; padding: 2px 5px;">${role.toUpperCase()}</div>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <div style="font-size: 10px; font-weight: bold; color: #444;">PSYCH PROFILE</div>
+                        <div style="font-size: 14px;">${faction.toUpperCase()}</div>
+                    </div>
+                </div>
+
+                <!-- S.P.E.C.I.A.L. & Verification -->
+                <div>
+                    <div style="border: 1px solid black; padding: 10px; margin-bottom: 15px;">
+                        <div style="font-size: 10px; font-weight: bold; text-align: center; border-bottom: 1px solid black; margin-bottom: 5px;">PHENOTYPE ANALYSIS</div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; font-size: 11px;">
+                            <div>STR: <b>${special.S}</b></div>
+                            <div>INT: <b>${special.I}</b></div>
+                            <div>PER: <b>${special.P}</b></div>
+                            <div>AGI: <b>${special.A}</b></div>
+                            <div>END: <b>${special.E}</b></div>
+                            <div>LCK: <b>${special.L}</b></div>
+                            <div>CHA: <b>${special.C}</b></div>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 10px;">
+                        <div style="font-size: 10px; font-weight: bold; color: #444;">DNA VERIFICATION HASH</div>
+                        <div style="font-family: monospace; font-size: 12px; background: black; color: white; padding: 2px; text-align: center;">${hash}</div>
+                    </div>
+
+                    <div style="text-align: center; border: 2px solid black; padding: 5px; transform: rotate(-5deg); margin-top: 20px;">
+                        <div style="font-size: 10px; font-weight: bold;">OFFICIAL STAMP</div>
+                        <div style="font-size: 14px; font-weight: bold;">APPROVED</div>
+                        <div style="font-size: 8px;">OVERSEER V. CALDWELL</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer / Anti-Forgery -->
+            <div style="margin-top: 30px; border-top: 2px solid black; padding-top: 10px; position: relative; z-index: 10;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 5px;">
+                    <div style="font-size: 8px; width: 60%;">
+                        WARNING: FORGERY OF THIS DOCUMENT IS A CLASS A FELONY PUNISHABLE BY PERMANENT EXILE OR EXECUTION.
+                        PROPERTY OF VAULT-TEC.
+                    </div>
+                    <div style="font-size: 10px; font-weight: bold;">
+                        ${date} ${time}
+                    </div>
+                </div>
+                
+                <!-- Barcode Simulation -->
+                <div class="barcode" style="color: black;">
+                    ${generateBarcode()}
+                </div>
+            </div>
+        </div>
+        `;
+
+        document.getElementById('print-container').innerHTML = printContent;
+        window.print();
+    }
+
+    /* --- SCREENS --- */
+
+    function renderIntro() {
+        return `
+        <div class="h-full flex flex-col items-center justify-center text-center p-8 bg-[url('https://www.transparenttextures.com/patterns/dark-matter.png')]">
+            <div class="mb-8 animate-pulse">
+                <div class="w-32 h-32 border-8 border-green-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-[0_0_20px_rgba(74,222,128,0.3)]">
+                    <div class="text-7xl font-bold tracking-tighter">V</div>
+                </div>
+            </div>
+            
+            <h1 class="text-4xl md:text-6xl font-bold mb-2 tracking-tighter text-shadow-glow">VAULT 254</h1>
+            <h2 class="text-xl md:text-2xl tracking-[0.5em] text-green-700 mb-8 font-bold">A.R.C. CITIZENSHIP MODULE</h2>
+            
+            <div class="max-w-md text-sm md:text-base text-green-400 mb-12 leading-relaxed border-l-2 border-green-800 pl-4 text-left">
+                <p class="mb-4">Welcome, Applicant.</p>
+                <p class="mb-4">You are about to initiate the Standard Citizenship Registration Protocol (SCRP-2275).</p>
+                <p>Compliance is mandatory. Truthfulness is monitored. Ensure your biometric sensors are active.</p>
+            </div>
+
+            <button onclick="window.state.step = 'identity'; renderApp();" class="px-8 py-3 bg-green-900/30 border-2 border-green-500 hover:bg-green-500 hover:text-black transition-all duration-200 font-bold tracking-widest text-lg uppercase group">
+                <span class="animate-blink mr-2">_</span>INITIATE APPLICATION
+            </button>
+            
+            <div class="absolute bottom-4 text-[10px] text-green-800">
+                VAULT-TEC INDUSTRIES © 2077 | "PREPARING FOR THE FUTURE"
+            </div>
+        </div>`;
+    }
+
+    function renderIdentity() {
+        const { name, age, gender } = window.state.identity;
+        return `
+        <div class="h-full flex flex-col p-4 md:p-12 relative">
+             <div class="absolute top-0 left-0 w-full h-2 bg-green-900/20">
+                <div class="h-full bg-green-500 w-[10%]"></div>
+             </div>
+
+            <div class="flex justify-between items-center mb-8 border-b border-green-800 pb-4">
+                <h2 class="text-2xl font-bold tracking-wider">STEP 1: IDENTITY</h2>
+                <span class="font-mono text-green-700">FORM 101-A</span>
+            </div>
+
+            <div class="flex-1 flex flex-col items-center justify-center max-w-2xl mx-auto w-full">
+                <div class="w-full space-y-8">
+                    
+                    <div class="space-y-2">
+                        <label class="block text-sm font-bold tracking-widest text-green-600">FULL LEGAL NAME</label>
+                        <div class="flex items-center border-b-2 border-green-500 bg-green-900/10">
+                            <span class="p-3 text-green-700">></span>
+                            <input type="text" value="${name}" oninput="window.state.identity.name = this.value" class="w-full bg-transparent border-none p-3 text-xl focus:ring-0 uppercase" placeholder="ENTER NAME..." autofocus>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-8">
+                        <div class="space-y-2">
+                            <label class="block text-sm font-bold tracking-widest text-green-600">AGE (YEARS)</label>
+                            <input type="number" value="${age}" oninput="window.state.identity.age = this.value" class="w-full p-3 text-xl bg-green-900/10 border border-green-600 focus:border-green-400 focus:bg-green-900/30" placeholder="16+">
+                        </div>
+                        
+                        <div class="space-y-2">
+                            <label class="block text-sm font-bold tracking-widest text-green-600">GENDER</label>
+                            <div class="flex h-[54px] border border-green-600 bg-green-900/10">
+                                <button onclick="window.state.identity.gender = 'M'; renderApp()" class="flex-1 hover:bg-green-500 hover:text-black transition-colors ${gender === 'M' ? 'bg-green-500 text-black font-bold' : ''}">M</button>
+                                <div class="w-px bg-green-600"></div>
+                                <button onclick="window.state.identity.gender = 'F'; renderApp()" class="flex-1 hover:bg-green-500 hover:text-black transition-colors ${gender === 'F' ? 'bg-green-500 text-black font-bold' : ''}">F</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-8 text-center">
+                        <button onclick="validateIdentity()" class="px-12 py-3 bg-green-900/20 border border-green-500 hover:bg-green-500 hover:text-black transition-all font-bold tracking-widest">
+                            PROCEED TO S.P.E.C.I.A.L. >>
+                        </button>
+                        <p id="identity-error" class="text-red-500 text-xs mt-4 h-4"></p>
+                    </div>
+
+                </div>
+            </div>
+        </div>`;
+    }
+
+    function validateIdentity() {
+        const { name, age, gender } = window.state.identity;
+        if (name.length < 2 || !age || !gender) {
+            document.getElementById('identity-error').innerText = "ERROR: ALL FIELDS REQUIRED FOR PROCESSING";
+            return;
+        }
+        window.state.step = 'special';
+        renderApp();
+    }
+
+    function renderSpecial() {
+        const { pointsRemaining } = window.state.special;
+        const stats = ['S', 'P', 'E', 'C', 'I', 'A', 'L'];
+        
+        // Generate rows
+        const rows = stats.map(statKey => {
+            const val = window.state.special[statKey];
+            const name = SPECIAL_DESCRIPTIONS[statKey].split(':')[0];
+            return `
+            <div class="flex items-center gap-4 group" onmouseenter="document.getElementById('special-desc').innerText = '${SPECIAL_DESCRIPTIONS[statKey]}'">
+                <div class="w-32 font-bold text-xl text-green-400 group-hover:text-green-200 transition-colors">${name}</div>
+                
+                <div class="flex items-center gap-1">
+                    <button onclick="updateSpecial('${statKey}', -1)" class="w-8 h-8 flex items-center justify-center border border-green-700 hover:bg-green-500 hover:text-black text-lg font-bold bg-black">-</button>
+                    <div class="w-12 h-8 flex items-center justify-center bg-green-900/20 border-t border-b border-green-800 font-mono text-xl">${val}</div>
+                    <button onclick="updateSpecial('${statKey}', 1)" class="w-8 h-8 flex items-center justify-center border border-green-700 hover:bg-green-500 hover:text-black text-lg font-bold bg-black">+</button>
+                </div>
+
+                <!-- Visual Bar -->
+                <div class="flex-1 h-4 bg-green-900/10 border border-green-900 hidden md:flex p-[2px]">
+                    <div class="h-full bg-green-500 transition-all duration-300" style="width: ${(val / 10) * 100}%"></div>
+                </div>
+            </div>`;
+        }).join('');
+
+        return `
+        <div class="h-full flex flex-col p-4 md:p-8 relative">
+            <div class="absolute top-0 left-0 w-full h-2 bg-green-900/20">
+                <div class="h-full bg-green-500 w-[35%]"></div>
+             </div>
+
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b border-green-800 pb-4">
+                <div>
+                    <h2 class="text-2xl font-bold tracking-wider">STEP 2: S.P.E.C.I.A.L.</h2>
+                    <span class="text-xs text-green-600">GENETIC PHENOTYPE ALLOCATION</span>
+                </div>
+                <div class="mt-4 md:mt-0 px-4 py-2 border-2 border-green-500 bg-green-900/20 text-center">
+                    <div class="text-[10px] text-green-400 uppercase tracking-widest mb-1">Points Remaining</div>
+                    <div class="text-3xl font-bold ${pointsRemaining === 0 ? 'text-green-500' : 'text-yellow-500 animate-pulse'}">${pointsRemaining}</div>
+                </div>
+            </div>
+
+            <div class="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-8 overflow-y-auto custom-scrollbar pr-2">
+                <!-- Stats Column -->
+                <div class="space-y-3">
+                    ${rows}
+                </div>
+
+                <!-- Info Column -->
+                <div class="flex flex-col gap-6">
+                    <!-- Description Box -->
+                    <div class="border-2 border-dashed border-green-800 p-6 bg-black min-h-[120px] flex items-center">
+                        <p id="special-desc" class="text-green-400 font-mono text-sm md:text-base leading-relaxed animate-fade-in">
+                            HOVER OVER A STATISTIC TO VIEW DETAILS.
+                        </p>
+                    </div>
+
+                    <!-- Vault Boy / Graphic Placeholder -->
+                    <div class="flex-1 border border-green-900 bg-green-900/5 flex items-center justify-center relative overflow-hidden">
+                        <div class="absolute inset-0 grid grid-cols-[repeat(20,minmax(0,1fr))] grid-rows-[repeat(20,minmax(0,1fr))] opacity-10">
+                            ${Array(400).fill('<div class="border-[0.5px] border-green-500/20"></div>').join('')}
+                        </div>
+                        <i data-lucide="dna" width="120" height="120" class="text-green-500/50 animate-pulse-slow"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 flex justify-between items-center pt-4 border-t border-green-900">
+                <button onclick="window.state.step = 'identity'; renderApp();" class="text-sm text-green-700 hover:text-green-500 flex items-center gap-2">
+                    <i data-lucide="arrow-left" width="16"></i> BACK
+                </button>
+                <button onclick="validateSpecial()" class="px-8 py-2 ${pointsRemaining === 0 ? 'bg-green-500 text-black hover:bg-white' : 'bg-gray-900 text-gray-500 cursor-not-allowed'} font-bold transition-colors">
+                    CONFIRM PHENOTYPE
+                </button>
+            </div>
+        </div>`;
+    }
+
+    function updateSpecial(stat, delta) {
+        const { special } = window.state;
+        const currentVal = special[stat];
+        const { pointsRemaining } = special;
+
+        if (delta > 0) {
+            if (pointsRemaining > 0 && currentVal < 10) {
+                window.state.special[stat]++;
+                window.state.special.pointsRemaining--;
+            }
+        } else {
+            if (currentVal > 1) {
+                window.state.special[stat]--;
+                window.state.special.pointsRemaining++;
+            }
+        }
+        renderApp();
+    }
+
+    function validateSpecial() {
+        if (window.state.special.pointsRemaining === 0) {
+            window.state.step = 'goat';
+            renderApp();
+        }
+    }
+
+    function renderGoat() {
+        const { currentQuestionIndex } = window.state.quiz;
+        const question = QUESTIONS[currentQuestionIndex];
+        const progress = ((currentQuestionIndex) / QUESTIONS.length) * 100;
+
+        return `
+        <div class="h-full flex flex-col p-4 md:p-12 relative bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]">
+            <div class="absolute top-0 left-0 w-full h-2 bg-green-900/20">
+                <div class="h-full bg-green-500 transition-all duration-500" style="width: ${60 + (progress * 0.4)}%"></div>
+             </div>
+
+            <div class="flex justify-between items-end mb-8 border-b border-green-800 pb-4">
+                <div>
+                    <h2 class="text-2xl font-bold tracking-wider">STEP 3: G.O.A.T.</h2>
+                    <span class="text-xs text-green-600">GENERALIZED OCCUPATIONAL APTITUDE TEST</span>
+                </div>
+                <div class="text-4xl font-bold text-green-900/50 select-none">${currentQuestionIndex + 1}/10</div>
+            </div>
+
+            <div class="flex-1 flex flex-col max-w-4xl mx-auto w-full">
+                <!-- Question -->
+                <div class="min-h-[100px] mb-8 flex items-center">
+                    <h3 class="text-lg md:text-2xl font-bold text-green-100 leading-snug typing-effect">
+                        ${question.text}
+                    </h3>
+                </div>
+
+                <!-- Options -->
+                <div class="grid grid-cols-1 gap-4">
+                    ${question.options.map((opt, idx) => `
+                        <button onclick="handleGoatAnswer(${idx})" 
+                            class="group relative w-full text-left p-4 md:p-6 border border-green-800 hover:border-green-400 bg-black hover:bg-green-900/20 transition-all duration-200 flex items-center gap-4">
+                            <div class="w-8 h-8 rounded-full border border-green-600 flex items-center justify-center text-sm font-bold group-hover:bg-green-500 group-hover:text-black transition-colors">
+                                ${['A','B','C','D'][idx]}
+                            </div>
+                            <span class="text-green-400 group-hover:text-white text-sm md:text-lg font-mono">${opt.text}</span>
+                            
+                            <!-- Selection Marker -->
+                            <div class="absolute right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <i data-lucide="check-circle" class="text-green-500"></i>
+                            </div>
+                        </button>
+                    `).join('')}
+                </div>
+            </div>
+        </div>`;
+    }
+
+    function handleGoatAnswer(optionIndex) {
+        const { currentQuestionIndex, answers } = window.state.quiz;
+        const question = QUESTIONS[currentQuestionIndex];
+        const selectedOption = question.options[optionIndex];
+
+        // Save Answer
+        window.state.quiz.answers.push(selectedOption.score);
+
+        // Next Question or Finish
+        if (currentQuestionIndex < QUESTIONS.length - 1) {
+            window.state.quiz.currentQuestionIndex++;
+            renderApp();
+        } else {
+            window.state.step = 'processing';
+            renderApp();
+            calculateResults();
+        }
+    }
+
+    function renderProcessing() {
+        return `
+        <div class="h-full flex flex-col items-center justify-center bg-black relative overflow-hidden">
+            <div class="space-y-6 text-center z-10">
+                <i data-lucide="cpu" width="64" height="64" class="text-green-500 mx-auto animate-spin duration-[3s]"></i>
+                <h2 class="text-2xl font-bold animate-pulse">PROCESSING APPLICANT DATA...</h2>
+                
+                <div class="w-64 h-2 bg-green-900/30 border border-green-700 mx-auto overflow-hidden">
+                    <div class="h-full bg-green-500 animate-[scanline_2s_ease-in-out_infinite] w-full" style="animation-direction: normal; animation-name: slideRight; width: 50%"></div>
+                </div>
+
+                <div class="font-mono text-xs text-green-700 space-y-1 h-20 overflow-hidden flex flex-col justify-end" id="process-log">
+                    <div>> UPLOADING BIOMETRICS... OK</div>
+                    <div>> ANALYZING G.O.A.T. RESPONSES... OK</div>
+                    <div>> CROSS-REFERENCING FACTION DB...</div>
+                    <div class="animate-blink">> CALCULATING LOYALTY INDEX...</div>
+                </div>
+            </div>
+            
+            <!-- Matrix BG -->
+            <div class="absolute inset-0 opacity-10 pointer-events-none grid-bg"></div>
+        </div>
+        <style>
+            @keyframes slideRight { 0% { width: 0; } 100% { width: 100%; } }
+        </style>
+        `;
+    }
+
+    function calculateResults() {
+        const answers = window.state.quiz.answers;
+        
+        // --- 1. COUNT SCORES ---
+        const factionCounts = {};
+        const roleCounts = {};
+        
+        answers.forEach(ans => {
+            factionCounts[ans.faction] = (factionCounts[ans.faction] || 0) + 1;
+            roleCounts[ans.role] = (roleCounts[ans.role] || 0) + 1;
+        });
+
+        // --- 2. FIND MAX VALUES ---
+        const maxFactionScore = Math.max(...Object.values(factionCounts));
+        const maxRoleScore = Math.max(...Object.values(roleCounts));
+
+        // --- 3. GET CANDIDATES (Handle Ties) ---
+        const factionCandidates = Object.keys(factionCounts).filter(f => factionCounts[f] === maxFactionScore);
+        const roleCandidates = Object.keys(roleCounts).filter(r => roleCounts[r] === maxRoleScore);
+
+        // --- 4. RANDOM SELECTION FOR TIES ---
+        const finalFaction = factionCandidates[Math.floor(Math.random() * factionCandidates.length)];
+        const finalRole = roleCandidates[Math.floor(Math.random() * roleCandidates.length)];
+
+        // --- 5. GENERATE HASH ---
+        const hash = generateHash(window.state.identity.name, finalRole, finalFaction);
+
+        window.state.result.faction = finalFaction;
+        window.state.result.role = finalRole;
+        window.state.result.hash = hash;
+
+        // Artificial Delay
+        setTimeout(() => {
+            window.state.step = 'result';
+            renderApp();
+        }, 3500);
+    }
+
+    function renderResult() {
+        const { name, gender } = window.state.identity;
+        const { faction, role, hash } = window.state.result;
+        
+        // Determine Status Color based on Faction (just for flavor)
+        let status = "APPROVED";
+        let colorClass = "text-green-500";
+        let borderColor = "border-green-500";
+        let subText = "REPORT TO OVERSEER OFFICE FOR INDUCTION.";
+
+        if (faction === 'Reclamationist') {
+            status = "PENDING REVIEW";
+            colorClass = "text-yellow-500";
+            borderColor = "border-yellow-500";
+            subText = "ADDITIONAL LOYALTY SCREENING REQUIRED.";
+        } else if (faction === 'Innovator') {
+            subText = "REPORT TO ENGINEERING DECK IMMEDIATELY.";
+        }
+
+        return `
+        <div class="h-full flex flex-col items-center justify-center p-4 md:p-8 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-green-900/20 via-black to-black">
+            
+            <div class="max-w-2xl w-full border-4 ${borderColor} bg-black p-8 relative shadow-[0_0_50px_rgba(0,0,0,0.5)] transform scale-100 animate-fade-in">
+                <!-- Stamp -->
+                <div class="absolute top-4 right-4 border-4 ${borderColor} opacity-50 p-2 transform rotate-12">
+                    <div class="text-xl font-bold ${colorClass} tracking-widest uppercase">${status}</div>
+                </div>
+
+                <div class="text-center mb-8 border-b border-green-800 pb-4">
+                    <i data-lucide="shield-check" width="48" height="48" class="mx-auto mb-4 text-green-500"></i>
+                    <h2 class="text-3xl font-bold text-green-100 tracking-tighter">APPLICATION PROCESSED</h2>
+                    <p class="text-green-700 text-sm tracking-[0.5em] mt-2">VAULT-TEC BUREAU OF CITIZENSHIP</p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-y-6 gap-x-12 text-sm md:text-base font-mono mb-8">
+                    <div>
+                        <span class="block text-green-700 text-xs font-bold mb-1">APPLICANT</span>
+                        <span class="text-green-300 uppercase font-bold text-lg">${name}</span>
+                    </div>
+                     <div>
+                        <span class="block text-green-700 text-xs font-bold mb-1">VERIFICATION HASH</span>
+                        <span class="text-green-300 uppercase text-xs border border-green-800 px-1 font-mono">${hash}</span>
+                    </div>
+                    
+                    <div class="col-span-2 h-px bg-green-900/50"></div>
+
+                    <div>
+                        <span class="block text-green-700 text-xs font-bold mb-1">ASSIGNED DEPARTMENT</span>
+                        <span class="text-green-300 uppercase font-bold text-xl flex items-center gap-2">
+                             ${role === 'Medical' ? '<i data-lucide="heart-pulse"></i>' : ''}
+                             ${role === 'Security' ? '<i data-lucide="shield"></i>' : ''}
+                             ${role === 'Engineering' ? '<i data-lucide="wrench"></i>' : ''}
+                             ${role === 'Management' ? '<i data-lucide="users"></i>' : ''}
+                             ${role}
+                        </span>
+                    </div>
+                    <div>
+                        <span class="block text-green-700 text-xs font-bold mb-1">PSYCH PROFILE MATCH</span>
+                        <span class="text-green-300 uppercase">${faction}</span>
+                    </div>
+                </div>
+
+                <div class="bg-green-900/20 p-4 border-l-4 ${borderColor} mb-8">
+                    <p class="${colorClass} text-sm leading-relaxed font-bold">
+                        ${subText}
+                    </p>
+                    <p class="text-green-600/80 text-xs mt-2 italic">
+                        "To Vault-Tec, innovating today, safeguarding tomorrow, and leading a better world after."
+                    </p>
+                </div>
+
+                <div class="flex gap-4">
+                     <button onclick="window.location.reload()" class="flex-1 py-3 bg-green-900/20 hover:bg-green-500 hover:text-black transition-colors border border-green-600 uppercase font-bold tracking-widest text-sm">
+                        PROCESS NEXT
+                    </button>
+                    <button onclick="triggerPrint()" class="flex-1 py-3 bg-green-500 text-black hover:bg-white transition-colors border border-green-500 uppercase font-bold tracking-widest text-sm flex items-center justify-center gap-2">
+                        <i data-lucide="printer" width="16"></i> PRINT OFFICIAL CREDENTIALS
+                    </button>
+                </div>
+            </div>
+        </div>`;
+    }
+
+    // --- INITIALIZE ---
+    document.addEventListener('DOMContentLoaded', () => {
+        renderApp();
+    });
+
+</script>
+</body>
+</html>
